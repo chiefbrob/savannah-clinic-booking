@@ -91,7 +91,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border-bottom: 1px solid var(--line);
 }
 .header-inner { display: flex; align-items: center; gap: 20px; height: 64px; }
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; letter-spacing: -0.02em; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
 .brand-mark {
   width: 32px; height: 32px; border-radius: 9px;
   background: linear-gradient(145deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #0b3b34));
@@ -111,9 +111,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .nav a:hover, .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
 .nav a[aria-current="page"] { background: var(--surface); border-color: var(--line); color: var(--ink); box-shadow: var(--shadow-sm); }
-@media (max-width: 720px) {
-  .nav a span.label { display: none; }
-  .header-inner { gap: 8px; }
+.lbl-short { display: none; }
+@media (max-width: 620px) {
+  .header-inner { gap: 6px; height: 58px; }
+  .brand { font-size: 14px; }
+  .brand small { display: none; }
+  .brand-mark { width: 28px; height: 28px; border-radius: 8px; }
+  .lbl-full { display: none; }
+  .lbl-short { display: inline; }
+  .nav a, .icon-btn { padding: 8px 10px; font-size: 13.5px; }
 }
 
 /* ---------- buttons ---------- */
@@ -176,7 +182,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; gap: 28px; } }
 .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--accent); background: var(--accent-soft); padding: 6px 12px; border-radius: var(--radius-pill); }
 .hero h1 { margin: 18px 0 16px; }
-.hero h1 em { font-style: normal; color: var(--accent); }
+.hero h1 em { font-style: normal; color: var(--accent); white-space: nowrap; }
 .hero p.lede { font-size: clamp(1rem, 1.4vw, 1.125rem); color: var(--muted); max-width: 46ch; }
 
 .hero-panel { padding: 6px; }
@@ -224,7 +230,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* ---------- booking ---------- */
 
 .book-grid { display: grid; gap: 22px; grid-template-columns: 340px 1fr; align-items: start; padding-top: 28px; }
-@media (max-width: 940px) { .book-grid { grid-template-columns: 1fr; } }
+/* Grid and flex children default to min-width:auto, which lets an overflowing
+   scroller (the date strip) stretch the track. Pin the children to 0. */
+.book-grid > *, .panel, .date-strip, .doctor-card, .appt > * { min-width: 0; }
+@media (max-width: 940px) {
+  .book-grid { grid-template-columns: 1fr; }
+  /* The picker comes first on a phone; the summary follows the form. */
+  .book-grid .summary-card { order: 3; }
+}
 
 .summary-card { position: sticky; top: 84px; padding: 22px; }
 @media (max-width: 940px) { .summary-card { position: static; } }
@@ -260,10 +273,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* slots */
 .slot-group + .slot-group { margin-top: 18px; }
 .slot-group h4 { color: var(--muted); margin-bottom: 10px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
-.slot-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); }
+.slot-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); }
 .slot {
   padding: 10px 4px; border-radius: 10px; border: 1px solid var(--line);
-  background: var(--surface); cursor: pointer; font-size: 14px; font-weight: 600;
+  background: var(--surface); cursor: pointer; font-size: 13.5px; font-weight: 600;
   font-variant-numeric: tabular-nums; transition: all 140ms ease;
 }
 .slot:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }

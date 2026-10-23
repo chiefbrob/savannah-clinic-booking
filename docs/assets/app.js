@@ -44,7 +44,7 @@ function relativeDay(iso) {
   if (target === today) return "today";
   const diff = (new Date(target) - new Date(today)) / 86400000;
   if (diff === 1) return "tomorrow";
-  return longDate(iso);
+  return `${weekday(iso)} ${dayOf(iso)} ${monthOf(iso)}`;
 }
 
 /* --------------------------------------------------------------- storage */
@@ -940,7 +940,9 @@ async function route() {
 /* ------------------------------------------------------------------ boot */
 
 function initTheme() {
-  const stored = localStorage.getItem("clinic.theme");
+  // ?theme=light|dark is handy for screenshots and for sharing a link.
+  const forced = new URLSearchParams(location.search).get("theme");
+  const stored = forced || localStorage.getItem("clinic.theme");
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   document.documentElement.dataset.theme = stored || (prefersDark ? "dark" : "light");
   $("#theme-toggle").addEventListener("click", () => {
