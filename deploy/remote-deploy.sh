@@ -19,6 +19,14 @@ echo "==> installing dependencies"
 echo "==> applying migrations"
 .venv/bin/alembic upgrade head
 
+echo "==> syncing nginx config"
+if ! cmp -s deploy/nginx.conf /etc/nginx/sites-available/clinic-booking; then
+    cp deploy/nginx.conf /etc/nginx/sites-available/clinic-booking
+    nginx -t
+    systemctl reload nginx
+    echo "    nginx updated"
+fi
+
 echo "==> restarting service"
 systemctl restart clinic-booking.service
 systemctl is-active --quiet clinic-booking.service

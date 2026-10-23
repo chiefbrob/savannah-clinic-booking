@@ -5,10 +5,13 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routers import appointments, doctors, health, patients
@@ -120,9 +123,12 @@ def create_app() -> FastAPI:
     app.include_router(appointments.router)
     app.include_router(patients.router)
 
-    @app.get("/", include_in_schema=False)
-    async def root() -> RedirectResponse:
-        return RedirectResponse(url="/docs")
+    # The booking UI is served by nginx from ./docs in production; mounting it
+    # here as well keeps `uvicorn app.main:app` a complete local environment.
+    # API routes are registered first, so they always win.
+    web_dir = Path(__file__).resolve().parent.parent / "docs"
+    if web_dir.is_dir():
+        app.mount("/", StaticFiles(directory=web_dir, html=True), name="app")
 
     return app
 

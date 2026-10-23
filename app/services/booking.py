@@ -128,6 +128,7 @@ async def create_appointment(
     doctor_id: uuid.UUID,
     patient_id: uuid.UUID,
     starts_at: datetime,
+    notes: str | None = None,
     now: datetime | None = None,
 ) -> Appointment:
     now = now or now_utc()
@@ -145,6 +146,7 @@ async def create_appointment(
         starts_at=slot.starts_at,
         ends_at=slot.ends_at,
         status=BOOKED,
+        notes=notes,
     )
     session.add(appointment)
     try:

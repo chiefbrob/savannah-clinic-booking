@@ -21,6 +21,26 @@ class DoctorRead(ORMModel):
     specialty: str
     email: str
     timezone: str
+    bio: str | None = None
+
+
+class DoctorNextAvailable(BaseModel):
+    doctor: DoctorRead
+    next_slot: datetime | None = Field(
+        default=None, description="Earliest bookable slot, or null if none in the window"
+    )
+
+
+class DayAvailability(BaseModel):
+    date: date
+    free_slots: int
+
+
+class AvailabilitySummary(BaseModel):
+    doctor_id: uuid.UUID
+    timezone: str
+    slot_minutes: int
+    days: list[DayAvailability]
 
 
 class PatientRead(ORMModel):
@@ -28,6 +48,25 @@ class PatientRead(ORMModel):
     name: str
     email: str
     phone: str | None = None
+
+
+class PatientCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: str = Field(max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    phone: str | None = Field(default=None, pattern=r"^\+?[0-9 ()\-]{7,20}$")
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        cleaned = " ".join(value.split())
+        if len(cleaned) < 2:
+            raise ValueError("name must contain at least 2 characters")
+        return cleaned
+
+    @field_validator("email")
+    @classmethod
+    def normalise_email(cls, value: str) -> str:
+        return value.strip().lower()
 
 
 class AvailabilityResponse(BaseModel):
@@ -42,6 +81,11 @@ class AppointmentCreate(BaseModel):
     doctor_id: uuid.UUID
     patient_id: uuid.UUID
     starts_at: datetime = Field(description="Slot start; must include a timezone offset")
+    notes: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Optional note for the doctor, e.g. 'child, age 4' or 'follow-up'",
+    )
 
     @field_validator("starts_at")
     @classmethod
@@ -51,6 +95,14 @@ class AppointmentCreate(BaseModel):
                 "starts_at must include a timezone offset, e.g. 2026-10-28T10:00:00+03:00"
             )
         return value
+
+    @field_validator("notes")
+    @classmethod
+    def blank_notes_are_none(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
 
 
 class RescheduleRequest(BaseModel):
@@ -82,11 +134,13 @@ class CancelRequest(BaseModel):
 
 class AppointmentRead(ORMModel):
     id: uuid.UUID
+    reference: str
     doctor_id: uuid.UUID
     patient_id: uuid.UUID
     starts_at: datetime
     ends_at: datetime
     status: str
+    notes: str | None = None
     cancel_reason: str | None = None
     cancelled_at: datetime | None = None
     created_at: datetime

@@ -31,18 +31,21 @@ DOCTORS = [
         "name": "Dr. Amina Wanjiru",
         "specialty": "General Practice",
         "email": "amina.wanjiru@clinic.example",
+        "bio": "Family medicine, 12 years. Long-term conditions, screenings and everyday illness.",
         "windows": [(day, "08:00", "16:00") for day in WEEKDAYS],
     },
     {
         "name": "Dr. Peter Otieno",
         "specialty": "Paediatrics",
         "email": "peter.otieno@clinic.example",
+        "bio": "Paediatrics. Newborn checks, childhood vaccinations and growth reviews.",
         "windows": [(day, "09:00", "17:00") for day in WEEKDAYS],
     },
     {
         "name": "Dr. Grace Mwangi",
         "specialty": "Obstetrics & Gynaecology",
         "email": "grace.mwangi@clinic.example",
+        "bio": "Obstetrics and gynaecology. Antenatal care, family planning and postnatal reviews.",
         # Split shift: mornings on Mon/Wed/Fri, afternoons on Tue/Thu.
         "windows": [
             (MON, "08:00", "13:00"),
@@ -56,12 +59,14 @@ DOCTORS = [
         "name": "Dr. Samuel Kiptoo",
         "specialty": "Cardiology",
         "email": "samuel.kiptoo@clinic.example",
+        "bio": "Cardiology. Blood pressure review, ECG interpretation and cardiac risk assessment.",
         "windows": [(day, "10:00", "18:00") for day in WEEKDAYS],
     },
     {
         "name": "Dr. Fatuma Hassan",
         "specialty": "Dermatology",
         "email": "fatuma.hassan@clinic.example",
+        "bio": "Dermatology. Eczema, acne, skin infections and allergy patch testing.",
         "windows": [(day, "08:00", "12:00") for day in (MON, TUE, WED, THU, FRI, SAT)],
     },
 ]
@@ -87,12 +92,16 @@ async def seed() -> dict[str, int]:
         for spec in DOCTORS:
             existing = await session.scalar(select(Doctor).where(Doctor.email == spec["email"]))
             if existing is not None:
+                # Keep re-seeding useful: fill in a missing profile blurb.
+                if existing.bio is None and spec.get("bio"):
+                    existing.bio = spec["bio"]
                 continue
             doctor = Doctor(
                 id=stable_id(f"doctor:{spec['email']}"),
                 name=spec["name"],
                 specialty=spec["specialty"],
                 email=spec["email"],
+                bio=spec.get("bio"),
                 timezone="Africa/Nairobi",
             )
             session.add(doctor)

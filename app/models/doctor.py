@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     SmallInteger,
     String,
+    Text,
     Time,
     UniqueConstraint,
     Uuid,
@@ -27,6 +28,7 @@ class Doctor(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     specialty: Mapped[str] = mapped_column(String(120), nullable=False, default="General Practice")
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     # Working hours are interpreted in this timezone.
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Africa/Nairobi")

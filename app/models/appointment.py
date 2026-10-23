@@ -59,8 +59,14 @@ class Appointment(Base, TimestampMixin):
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default=BOOKED)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def reference(self) -> str:
+        """Short human-friendly reference, e.g. CLN-4F2A9C."""
+        return f"CLN-{self.id.hex[:6].upper()}"
 
     doctor: Mapped[Doctor] = relationship(back_populates="appointments", lazy="raise")
     patient: Mapped[Patient] = relationship(back_populates="appointments", lazy="raise")

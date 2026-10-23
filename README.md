@@ -6,9 +6,9 @@ be held by two patients.
 
 | | |
 |---|---|
-| **Live API** | https://clinic.dabotap.com |
-| **Interactive docs (Swagger)** | https://clinic.dabotap.com/docs |
-| **Demo UI** | https://chiefbrob.github.io/savannah-clinic-booking/ |
+| **App** | https://clinic.dabotap.com |
+| **API docs (Swagger)** | https://clinic.dabotap.com/docs |
+| **Static mirror of the app** | https://chiefbrob.github.io/savannah-clinic-booking/ |
 | **Repository** | https://github.com/chiefbrob/savannah-clinic-booking |
 | **Stack** | Python 3.12 · FastAPI · SQLAlchemy 2 (async) · PostgreSQL 16 · Alembic |
 | **Deployment** | Ubuntu host behind nginx + systemd, deployed by GitHub Actions |
@@ -21,10 +21,11 @@ be held by two patients.
 2. [Section 1 — System design](#section-1--system-design)
 3. [Section 2 — API](#section-2--api)
 4. [How double-booking is actually prevented](#how-double-booking-is-actually-prevented)
-5. [Tests](#tests)
-6. [Section 3 — Deployment and CI/CD](#section-3--deployment-and-cicd)
-7. [Assumptions and ambiguities](#assumptions-and-ambiguities)
-8. [Section 4 — AI reflection](#section-4--ai-reflection)
+5. [The app](#the-app)
+6. [Tests](#tests)
+7. [Section 3 — Deployment and CI/CD](#section-3--deployment-and-cicd)
+8. [Assumptions and ambiguities](#assumptions-and-ambiguities)
+9. [Section 4 — AI reflection](#section-4--ai-reflection)
 
 ---
 
@@ -55,6 +56,32 @@ uvicorn app.main:app --reload
 
 Run the tests with `pytest -q` (needs the same Postgres; the suite creates its
 own schema in `clinic_test`).
+
+---
+
+## The app
+
+The root URL is a booking app, not a docs page. It is deliberately
+build-step-free: three static files (`docs/index.html`, `assets/app.css`,
+`assets/app.js`) served by nginx, with the API on the same origin.
+
+| Screen | What it does |
+|---|---|
+| **Home** | Live "next available" list and doctor cards, each showing the soonest real slot |
+| **Book** (`#/book/{doctor}`) | 21-day calendar strip with per-day free counts, slots grouped by morning/afternoon/evening, a details step (name, email, phone, note to the doctor) and a sticky summary with the confirm action |
+| **Confirmation** | Reference (`CLN-1A2B3C`), date/time, add-to-calendar `.ics`, link to manage |
+| **My appointments** | Look up by email, upcoming and earlier lists, status chips |
+| **Manage** (`#/appointment/{id}`) | Reschedule (in-place slot picker) or cancel with a reason |
+
+Details that make it behave like a product rather than a demo:
+
+* a slot taken between page load and submit is caught — the UI says so and
+  re-loads availability instead of failing silently;
+* the details form remembers a returning patient (`localStorage`) and reuses
+  their record by email, so nobody is duplicated;
+* every list has a skeleton, an empty state and an error state;
+* light and dark themes, keyboard-first focus handling, focus trap in dialogs,
+  `aria-live` toasts, and `prefers-reduced-motion` respected.
 
 ---
 
@@ -191,6 +218,10 @@ Base URL: `https://clinic.dabotap.com` · Swagger: `/docs` · OpenAPI: `/openapi
 | `PATCH` | `/appointments/{id}/cancel` | Cancel with a reason; the slot becomes bookable again |
 | `PATCH` | `/appointments/{id}/reschedule` | Move to a new slot, validated like a fresh booking |
 | `GET` | `/patients/{id}/appointments` | Upcoming appointments, soonest first *(bonus)* |
+| `GET` | `/doctors/next-available` | Every doctor's soonest free slot — one request for the home screen |
+| `GET` | `/doctors/{id}/availability/summary` | Free-slot count per day, for the calendar strip |
+| `POST` | `/patients` | Register a patient (409 if the email exists) |
+| `GET` | `/patients/lookup?email=` | Find a returning patient by email |
 | `GET` | `/doctors`, `/patients`, `/appointments/{id}` | Convenience reads for the UI |
 | `GET` | `/health` | Liveness + database check |
 
@@ -308,7 +339,7 @@ exactly one booked row.
 
 ## Tests
 
-37 tests, run against a real PostgreSQL (no SQLite, so the partial index is the
+50 tests, run against a real PostgreSQL (no SQLite, so the partial index is the
 real thing). `pytest -q`.
 
 | Area | Covered |
@@ -319,6 +350,8 @@ real thing). `pytest -q`.
 | Reschedule | moves and frees the old slot, target taken → 409 with the original intact, cancelled appointment → 409, validates like a fresh booking, same-slot no-op |
 | Concurrency | 10 racing bookings → 1 winner / 9 conflicts; parallel bookings on distinct slots all succeed; cancel + re-book never leaves two active bookings |
 | Patients | upcoming only, sorted, cancelled excluded, `include_past` |
+| Registration | 201 with normalised email, duplicate → 409 naming the existing patient, lookup by email, malformed email → 422 |
+| Calendar | summary counts per day, summary and per-day endpoints agree, `next-available` picks the soonest slot, null when a doctor has no hours |
 | Platform | health check, error envelope on unknown routes, OpenAPI served |
 
 Time is pinned (`FIXED_NOW`, a Monday) and injected through `get_now`, so
@@ -486,6 +519,6 @@ app/
 tests/                    37 tests incl. test_concurrency.py
 migrations/               alembic (0001_initial holds the partial unique index)
 deploy/                   systemd unit · nginx · provision.py · remote-deploy.sh
-docs/                     GitHub Pages demo site
+docs/                     the booking app (served at / by nginx, and by GitHub Pages)
 .github/workflows/        ci.yml · deploy.yml
 ```

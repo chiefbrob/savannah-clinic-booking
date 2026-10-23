@@ -30,6 +30,7 @@ async def create_appointment(
         doctor_id=payload.doctor_id,
         patient_id=payload.patient_id,
         starts_at=payload.starts_at,
+        notes=payload.notes,
         now=now,
     )
     response.headers["Location"] = f"/appointments/{appointment.id}"
