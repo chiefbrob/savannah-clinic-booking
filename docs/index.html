@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clinic Booking API — Savannah Informatics assessment</title>
+<meta name="description" content="Booking API for a five-doctor clinic: 30-minute slots, working hours, and no double bookings. FastAPI + PostgreSQL.">
+<style>
+  :root{
+    --bg:#0f1220; --panel:#171a2b; --panel-2:#1e2238; --ink:#e8eaf3; --muted:#9aa1bd;
+    --line:#2b3050; --accent:#6ea8fe; --ok:#3ddc97; --warn:#ffb454; --err:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  header{padding:56px 24px 32px;max-width:1040px;margin:0 auto}
+  h1{font-size:clamp(28px,4vw,44px);line-height:1.15;margin:0 0 12px;letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:18px;max-width:70ch;margin:0 0 24px}
+  .links{display:flex;flex-wrap:wrap;gap:10px}
+  .btn{display:inline-block;padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font-size:14px}
+  .btn:hover{border-color:var(--accent);text-decoration:none}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#08101f;font-weight:600}
+  main{max-width:1040px;margin:0 auto;padding:0 24px 80px}
+  section{margin:40px 0}
+  h2{font-size:22px;margin:0 0 14px;letter-spacing:-.01em}
+  h3{font-size:16px;margin:24px 0 8px;color:var(--ink)}
+  p{color:#c9cde3;margin:0 0 12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .grid{display:grid;gap:14px}
+  @media(min-width:760px){.grid.two{grid-template-columns:1fr 1fr}}
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
+  select,input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font-size:15px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
+  .row > div{flex:1 1 180px}
+  .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:16px}
+  .slot{padding:10px 6px;text-align:center;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;font-variant-numeric:tabular-nums;font-size:14px}
+  .slot:hover{border-color:var(--accent);color:var(--accent)}
+  .slot[disabled]{opacity:.4;cursor:not-allowed}
+  .muted{color:var(--muted);font-size:14px}
+  .banner{margin-top:16px;padding:12px 14px;border-radius:10px;font-size:14px;border:1px solid var(--line);background:var(--panel-2)}
+  .banner.ok{border-color:#1f6f4d;background:#10261d;color:#b8f5d6}
+  .banner.err{border-color:#7a2c2c;background:#2a1414;color:#ffc9c9}
+  .banner.warn{border-color:#7a5a1f;background:#2a2210;color:#ffe3ab}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  td,th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:#11142a;padding:1px 5px;border-radius:5px}
+  pre{background:#11142a;border:1px solid var(--line);border-radius:12px;padding:16px;overflow:auto;font-size:13px}
+  footer{border-top:1px solid var(--line);padding:24px;text-align:center;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Clinic booking API</h1>
+  <p class="sub">
+    Five doctors, recurring working hours, 30-minute slots. A patient sees what is genuinely
+    free, books one, can cancel with a reason, or move it — and two patients can never hold
+    the same slot, even if they tap at the same instant.
+  </p>
+  <div class="links">
+    <a class="btn primary" href="https://clinic.dabotap.com/docs">API docs (Swagger) →</a>
+    <a class="btn" href="https://github.com/chiefbrob/savannah-clinic-booking">Source</a>
+    <a class="btn" href="https://clinic.dabotap.com/health">Health</a>
+    <a class="btn" href="https://clinic.dabotap.com/openapi.json">OpenAPI</a>
+  </div>
+</header>
+
+<main>
+
+  <section>
+    <h2>Try it, live</h2>
+    <p class="muted" style="margin-bottom:16px">
+      This page is static (GitHub Pages) and talks to the deployed API at
+      <a href="https://clinic.dabotap.com">clinic.dabotap.com</a>. Bookings made here are real rows
+      in the live database — that is the point of the demo.
+    </p>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label for="doctor">Doctor</label>
+          <select id="doctor"></select>
+        </div>
+        <div>
+          <label for="date">Date (clinic time)</label>
+          <input id="date" type="date">
+        </div>
+        <div style="flex:0 0 auto">
+          <button class="btn primary" id="load">Show free slots</button>
+        </div>
+      </div>
+
+      <div id="status" class="banner" hidden></div>
+      <div id="slots" class="slots"></div>
+      <div id="appointment" class="banner" hidden></div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div class="card">
+      <h2>Why it cannot double-book</h2>
+      <p>
+        Validation produces good error messages, but it is not what protects the slot.
+        The guarantee is a <strong>partial unique index</strong> in PostgreSQL:
+      </p>
+      <pre><code>CREATE UNIQUE INDEX ix_appointments_no_double_booking
+    ON appointments (doctor_id, starts_at)
+    WHERE status = 'booked';</code></pre>
+      <p>
+        Two concurrent inserts for the same slot cannot both commit. Cancelling flips
+        <code>status</code>, which drops the row out of the index and frees the slot in the same
+        statement. The test suite fires ten simultaneous bookings at one slot and asserts
+        exactly one <code>201</code> and nine <code>409</code>s.
+      </p>
+    </div>
+    <div class="card">
+      <h2>Status codes</h2>
+      <table>
+        <tr><td><code>201</code></td><td>Booked</td></tr>
+        <tr><td><code>400</code></td><td>Outside hours, misaligned, past, too soon</td></tr>
+        <tr><td><code>404</code></td><td>Unknown doctor / patient / appointment</td></tr>
+        <tr><td><code>409</code></td><td>Slot taken, already cancelled</td></tr>
+        <tr><td><code>422</code></td><td>Malformed body (e.g. no timezone on a datetime)</td></tr>
+      </table>
+      <p class="muted" style="margin-top:12px">
+        Errors always come back as <code>{"error":{"code","message","details"}}</code>.
+      </p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>What the service does</h2>
+    <p>
+      <code>POST /appointments</code> validates the slot against the doctor's working hours, the
+      30-minute grid, and a one-hour lead time, then lets the database settle any race.
+      <code>GET /doctors/{id}/availability</code> derives slots from the weekly schedule minus
+      active bookings — nothing is materialised, so a change of hours needs no backfill.
+      <code>PATCH …/cancel</code> records a reason and frees the slot.
+      <code>PATCH …/reschedule</code> is a single update inside one transaction, so the patient
+      never holds both slots or neither.
+    </p>
+    <p class="muted">
+      Times are returned in UTC; working hours are interpreted in Africa/Nairobi.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  Savannah Informatics — Implementation Engineer take-home · FastAPI · SQLAlchemy 2 · PostgreSQL 16
+</footer>
+
+<script>
+const API = "https://clinic.dabotap.com";
+const $ = (id) => document.getElementById(id);
+
+function show(el, kind, html) {
+  el.className = "banner " + kind;
+  el.innerHTML = html;
+  el.hidden = false;
+}
+
+function fmt(iso) {
+  return new Date(iso).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", timeZone: "Africa/Nairobi"});
+}
+
+async function api(path, options) {
+  const res = await fetch(API + path, options);
+  const body = await res.json().catch(() => ({}));
+  return {status: res.status, body};
+}
+
+async function loadDoctors() {
+  const {body} = await api("/doctors");
+  const select = $("doctor");
+  select.innerHTML = "";
+  (body || []).forEach((d) => {
+    const option = document.createElement("option");
+    option.value = d.id;
+    option.textContent = `${d.name} — ${d.specialty}`;
+    select.appendChild(option);
+  });
+}
+
+async function demoPatient() {
+  const {body} = await api("/patients");
+  return body && body.length ? body[0] : null;
+}
+
+async function loadSlots() {
+  const doctorId = $("doctor").value;
+  const date = $("date").value;
+  $("appointment").hidden = true;
+  $("slots").innerHTML = "";
+  if (!doctorId || !date) return;
+
+  const {status, body} = await api(`/doctors/${doctorId}/availability?date=${date}`);
+  if (status !== 200) {
+    show($("status"), "err", `Could not load availability (HTTP ${status}).`);
+    return;
+  }
+  if (!body.slots.length) {
+    show($("status"), "warn", "No free slots on that date — the doctor may not work that day, or everything is booked.");
+    return;
+  }
+  show($("status"), "ok", `${body.slots.length} free slot${body.slots.length === 1 ? "" : "s"} — ${body.timezone}. Click one to book it.`);
+
+  body.slots.forEach((slot) => {
+    const button = document.createElement("div");
+    button.className = "slot";
+    button.textContent = fmt(slot.starts_at);
+    button.onclick = () => book(doctorId, slot.starts_at, button);
+    $("slots").appendChild(button);
+  });
+}
+
+async function book(doctorId, startsAt, element) {
+  const patient = await demoPatient();
+  if (!patient) {
+    show($("status"), "err", "No demo patient available.");
+    return;
+  }
+  element.setAttribute("disabled", "true");
+
+  const {status, body} = await api("/appointments", {
+    method: "POST",
+    headers: {"content-type": "application/json"},
+    body: JSON.stringify({doctor_id: doctorId, patient_id: patient.id, starts_at: startsAt}),
+  });
+
+  if (status === 201) {
+    show($("status"), "ok", "Booked.");
+    const box = $("appointment");
+    box.className = "banner ok";
+    box.hidden = false;
+    box.innerHTML = `
+      <strong>${patient.name}</strong> is booked for
+      <strong>${fmt(body.starts_at)}–${fmt(body.ends_at)}</strong> on
+      ${new Date(body.starts_at).toLocaleDateString([], {timeZone: "Africa/Nairobi"})}.
+      <br><span class="muted">appointment ${body.id.slice(0, 8)}…</span>
+      <div style="margin-top:10px"><button class="btn" id="cancel">Cancel this appointment</button></div>`;
+    $("cancel").onclick = () => cancel(body.id);
+    loadSlots();
+  } else if (status === 409) {
+    show($("status"), "err", "Someone booked that slot first — the API returned 409 <code>slot_taken</code>.");
+    element.setAttribute("disabled", "true");
+    setTimeout(loadSlots, 800);
+  } else {
+    show($("status"), "err", `${body.error ? body.error.message : "Booking failed"} (HTTP ${status}).`);
+    element.removeAttribute("disabled");
+  }
+}
+
+async function cancel(id) {
+  const {status, body} = await api(`/appointments/${id}/cancel`, {
+    method: "PATCH",
+    headers: {"content-type": "application/json"},
+    body: JSON.stringify({reason: "Cancelled from the demo page"}),
+  });
+  const box = $("appointment");
+  if (status === 200) {
+    show(box, "warn", `Cancelled — the slot is free again (${body.cancel_reason}).`);
+    loadSlots();
+  } else {
+    show(box, "err", body.error ? body.error.message : `Cancel failed (HTTP ${status}).`);
+  }
+}
+
+(function init() {
+  const today = new Date().toLocaleDateString("en-CA", {timeZone: "Africa/Nairobi"});
+  $("date").value = today;
+  $("date").min = today;
+  loadDoctors().then(loadSlots);
+  $("load").onclick = loadSlots;
+  $("date").onchange = loadSlots;
+  $("doctor").onchange = loadSlots;
+})();
+</script>
+</body>
+</html>

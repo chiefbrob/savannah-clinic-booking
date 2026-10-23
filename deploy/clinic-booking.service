@@ -1,0 +1,32 @@
+[Unit]
+Description=Clinic booking API (FastAPI)
+Documentation=https://github.com/chiefbrob/savannah-clinic-booking
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=clinic
+Group=clinic
+WorkingDirectory=/srv/clinic-booking
+EnvironmentFile=/srv/clinic-booking/.env
+ExecStart=/srv/clinic-booking/.venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 --port 8100 \
+    --proxy-headers --forwarded-allow-ips=127.0.0.1 \
+    --workers 2
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+
+# Hardening: the service only needs its own directory and outbound DB access.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/clinic-booking
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,54 @@
+name: Deploy
+
+# Deploys only after the CI workflow has passed on main — i.e. when a pull
+# request is merged. A manual run is available for disaster recovery.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to pinkman
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+
+    environment:
+      name: production
+      url: https://clinic.dabotap.com
+
+    steps:
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ secrets.VPS_PORT }}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Run remote deploy
+        run: |
+          ssh -p "${{ secrets.VPS_PORT }}" \
+              -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=yes \
+              "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+              '/srv/clinic-booking/deploy/remote-deploy.sh'
+
+      - name: Verify the public URL
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsS https://clinic.dabotap.com/health | grep -q '"status":"ok"'; then
+              echo "public health check passed"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "public health check failed" >&2
+          exit 1
