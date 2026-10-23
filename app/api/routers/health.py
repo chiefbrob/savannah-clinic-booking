@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter
 from sqlalchemy import text
 
@@ -8,6 +10,7 @@ from app.core.config import get_settings
 from app.schemas import HealthResponse
 
 router = APIRouter(tags=["health"])
+logger = logging.getLogger("clinic.health")
 
 
 @router.get("/health", response_model=HealthResponse, summary="Liveness and database check")
@@ -17,6 +20,7 @@ async def health(session: SessionDep) -> HealthResponse:
     try:
         await session.execute(text("SELECT 1"))
     except Exception:  # pragma: no cover - only when the DB is down
+        logger.exception("health check: database query failed")
         database = "unavailable"
     return HealthResponse(
         status="ok" if database == "ok" else "degraded",
