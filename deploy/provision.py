@@ -94,6 +94,8 @@ def main() -> int:
     run("chown", "-R", f"{SERVICE_USER}:{SERVICE_USER}", str(APP_DIR))
 
     # 5. systemd unit
+    # The checkout is owned by the service user, so root's git needs this.
+    run("git", "config", "--global", "--add", "safe.directory", str(APP_DIR), check=False)
     shutil.copy(APP_DIR / "deploy" / "clinic-booking.service", "/etc/systemd/system/")
     run("systemctl", "daemon-reload")
     run("systemctl", "enable", "clinic-booking.service", check=False)

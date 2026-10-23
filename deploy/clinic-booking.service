@@ -10,6 +10,10 @@ User=clinic
 Group=clinic
 WorkingDirectory=/srv/clinic-booking
 EnvironmentFile=/srv/clinic-booking/.env
+# asyncpg probes $HOME/.postgresql/postgresql.key for client certs; with
+# ProtectHome=true an unreadable /home/clinic raises PermissionError.
+# Point HOME at the app directory instead of weakening the sandbox.
+Environment=HOME=/srv/clinic-booking
 ExecStart=/srv/clinic-booking/.venv/bin/uvicorn app.main:app \
     --host 127.0.0.1 --port 8100 \
     --proxy-headers --forwarded-allow-ips=127.0.0.1 \
