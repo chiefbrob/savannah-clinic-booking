@@ -65,6 +65,10 @@ The root URL is a booking app, not a docs page. It is deliberately
 build-step-free: three static files (`docs/index.html`, `assets/app.css`,
 `assets/app.js`) served by nginx, with the API on the same origin.
 
+| Home | Booking (mobile) |
+|---|---|
+| ![Home](docs/assets/screenshot-home.png) | ![Booking](docs/assets/screenshot-book.png) |
+
 | Screen | What it does |
 |---|---|
 | **Home** | Live "next available" list and doctor cards, each showing the soonest real slot |
