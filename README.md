@@ -448,6 +448,15 @@ response. Pydantic puts the original `ValueError` object under `ctx`, which is
 not JSON-serialisable, so a naive datetime produced a `500`. The
 naive-datetime test caught it; the handler now stringifies `ctx` values.
 
+A third one only appeared in production. The systemd unit it drafted had
+`ProtectHome=true` for hardening, and asyncpg probes `$HOME/.postgresql/postgresql.key`
+for client certificates before connecting. With the home directory unreadable that
+`os.stat` raised `PermissionError`, and every request failed to reach Postgres —
+`/health` reported `database: unavailable` while `psql` from the shell worked fine.
+The health check had been swallowing the traceback, so the fix was two-part: log
+the exception (it does now), and set `Environment=HOME=/srv/clinic-booking` in the
+unit rather than weakening the sandbox.
+
 **4. Two decisions I made without AI, and why I trusted my judgment.**
 
 *Timezone handling.* I chose to store instants in UTC but express working hours,
