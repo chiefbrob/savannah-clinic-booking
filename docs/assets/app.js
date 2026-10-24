@@ -257,9 +257,7 @@ async function home() {
       </div>
     </section>`;
 
-  $("#cta-doctors").addEventListener("click", () => {
-    $("#doctors-section").scrollIntoView({ behavior: "smooth", block: "start" });
-  });
+  $("#cta-doctors").addEventListener("click", () => startBooking());
 
   try {
     const [doctors, next] = await Promise.all([getDoctors(), api("/doctors/next-available")]);
@@ -268,6 +266,34 @@ async function home() {
   } catch (error) {
     $("#next-panel").innerHTML = `<div class="error-box">Could not load availability. ${esc(error.message)}</div>`;
     $("#doctor-grid").innerHTML = `<div class="error-box">Could not load doctors. ${esc(error.message)}</div>`;
+  }
+}
+
+async function startBooking(button) {
+  const cta = button || $("#cta-doctors");
+  const original = cta ? cta.textContent : "";
+  if (cta) {
+    cta.disabled = true;
+    cta.textContent = "Finding the soonest time…";
+  }
+  try {
+    const rows = await api("/doctors/next-available");
+    const soonest = rows
+      .filter((row) => row.next_slot)
+      .sort((a, b) => new Date(a.next_slot) - new Date(b.next_slot));
+    const target = soonest[0]?.doctor || rows[0]?.doctor;
+    if (!target) {
+      toast("No doctor is available right now — please call the clinic.", "err");
+      return;
+    }
+    location.hash = `#/book/${target.id}`;
+  } catch (error) {
+    toast(error.message, "err");
+  } finally {
+    if (cta) {
+      cta.disabled = false;
+      cta.textContent = original;
+    }
   }
 }
 
@@ -463,7 +489,8 @@ function renderBookingSummary(view) {
   $("#summary").innerHTML = `
     <div class="doc-head">
       ${doctorAvatar(view.doctor, true)}
-      <div><h3>${esc(view.doctor.name)}</h3><div class="spec small" style="color:var(--accent);font-weight:600">${esc(view.doctor.specialty)}</div></div>
+      <div style="min-width:0"><h3>${esc(view.doctor.name)}</h3><div class="spec small" style="color:var(--accent);font-weight:600">${esc(view.doctor.specialty)}</div></div>
+      <button class="btn btn-sm btn-ghost" id="change-doctor" type="button" style="margin-left:auto">Change</button>
     </div>
     <dl class="summary-lines">
       <div class="summary-line"><dt>Date</dt><dd>${slot ? esc(longDate(slot.starts_at)) : "—"}</dd></div>
@@ -479,6 +506,7 @@ function renderBookingSummary(view) {
     </p>`;
 
   $("#confirm")?.addEventListener("click", () => submitBooking(view, patient));
+  $("#change-doctor")?.addEventListener("click", () => openDoctorPicker(view.doctor.id));
 }
 
 async function submitBooking(view, patient) {
@@ -579,6 +607,36 @@ function downloadICS(appointment, doctor) {
   link.remove();
   URL.revokeObjectURL(url);
   toast("Calendar file downloaded.");
+}
+
+function openDoctorPicker(currentId) {
+  openModal({
+    title: "Choose a doctor",
+    body: `<div id="picker" class="stack"><div class="skeleton" style="height:60px"></div><div class="skeleton" style="height:60px"></div><div class="skeleton" style="height:60px"></div></div>`,
+    onMount(root, close) {
+      (async () => {
+        const [doctors, next] = await Promise.all([getDoctors(), api("/doctors/next-available")]);
+        const byId = new Map(next.map((row) => [row.doctor.id, row.next_slot]));
+        root.querySelector("#picker").innerHTML = doctors
+          .map((doctor) => {
+            const slot = byId.get(doctor.id);
+            return `
+            <button class="pick-row" type="button" data-pick="${doctor.id}" ${doctor.id === currentId ? 'aria-current="true"' : ""}>
+              ${doctorAvatar(doctor)}
+              <span class="who"><b>${esc(doctor.name)}</b><span>${esc(doctor.specialty)}</span></span>
+              <span class="when">${slot ? `${esc(clock(slot))}<span>${esc(relativeDay(slot))}</span>` : "<span>Fully booked</span>"}</span>
+            </button>`;
+          })
+          .join("");
+        root.querySelectorAll("[data-pick]").forEach((button) => {
+          button.addEventListener("click", () => {
+            close();
+            location.hash = `#/book/${button.dataset.pick}`;
+          });
+        });
+      })().catch((error) => toast(error.message, "err"));
+    },
+  });
 }
 
 /* ------------------------------------------------------- my appointments */
